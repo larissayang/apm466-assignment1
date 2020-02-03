@@ -1,0 +1,275 @@
+---
+title: "Untitled"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+bondprice <- read.csv("~/Desktop/bondpriceonly.csv", header = TRUE)
+```
+Empirical Questions: 4a) yields
+```{r}
+yield <- matrix(ncol = 10, nrow = 10)
+clean <- matrix(ncol = 10, nrow = 10)
+
+for (i in 1:10){
+  for (j in 1:10){
+    clean[i,j] <- as.numeric(as.character(bondprice[15-i, 1+j]))
+  }
+}
+colnames(clean) <- c(1,2,3,4,5,6,7,8,9,10)
+rownames(clean) <- c("D1","D2","D3","D4","D5","D6","D7",'D8','D9','D10')
+
+for (i in 1:10){
+  settle <- as.Date(bondprice$X[15-i], "%m/%d/%y")
+  yield[i,] <- bond.yields(settle=settle, mature=c("2020-03-01", "2020-09-01", "2021-03-01", "2021-09-01", "2022-03-01", "2022-09-01", "2023-03-01", "2023-09-01", "2024-03-01", "2024-09-01"),
+            coupon=c(0.015, 0.0075, 0.0075, 0.0075, 0.005, 0.0275, 0.0175, 0.015, 0.0225, 0.015),
+            price=c(clean[i,1], clean[i,2], clean[i,3], clean[i,4], clean[i,5], clean[i,6], clean[i,7], clean[i,8], clean[i,9], clean[i,10]), freq = 2, comp.freq = Inf, redemption_value = 100)
+}
+
+```
+Plot for yield.
+```{r}
+d <- seq(0.5, 5, by=0.5)
+plot(d, yield[1,], col = 1, type = "l", xlab = "Year", ylab = "Yield", main = "5-year yield curve for 10 bonds of 10 days")
+for (i in 2:10) {
+  lines(d, yield[i,], col = i, type = "l")
+}
+legend("topright", legend = c("2020-01-02", "2020-01-03", "2020-01-06", "2020-01-07", "2020-01-08", "2020-01-09","2020-01-10", "2020-01-13", "2020-01-14","2020-01-15"), col = 1:10, lty = 1)
+```
+Empirical Questions 4b) spot rate.
+```{r}
+dirtyprice <- matrix(ncol = 10, nrow = 10)
+
+
+for (i in 1:10){
+  date = bondprice$X[4+i]
+  changed_settle = as.Date(date, "%m/%d/%y")
+  for (j in 1:10){
+    maturity = bondprice[3,1+j]
+    changed_mature <- as.Date(maturity, "%m/%d/%y")
+    c <- as.numeric(as.character(bondprice[1,j+1]))
+    a <- bond.TCF(settle = changed_settle, mature = changed_mature, coupon = c, freq = 2,  redemption_value = 100)
+    dirtyprice[i,j] <- a$accrued + clean[i,j]
+  }
+}
+
+spot <- matrix(ncol = 10, nrow = 10)
+colnames(spot) <- c("mar2020","sep 2020", "mar2021", "sep2021","mar2022", "sep2022", "mar2023", "sep2023", "mar2024", "sep2024")
+rownames(spot) <- c("D1","D2","D3","D4","D5","D6","D7",'D8','D9','D10')
+```
+
+```{r}
+c1 <- as.numeric(as.character(bondprice[1,2]))*100/2
+redem <- 100
+for (i in 1:10){
+  date1 <- as.Date(bondprice$X[15-i], "%m/%d/%y")
+  spot[i,1] <- -log(dirtyprice[i,1]/(redem+c1))/yearFraction(date1, "2020-03-01")
+}
+
+c2 <- as.numeric(as.character(bondprice[1,3]))*100/2
+for (i in 1:10){
+  date2 <- as.Date(bondprice$X[15-i], "%m/%d/%y")
+  t1 <- yearFraction(date2, "2020-03-01")
+  cf2 <- c2*exp(-spot[i,1]*t1)
+  spot[i,2] <- -log((dirtyprice[i,2] - cf2)/(redem+c2))/yearFraction(date2, "2020-09-01")
+}
+
+c3 <- as.numeric(as.character(bondprice[1,4]))*100/2
+for (i in 1:10){
+  date3 <- as.Date(bondprice$X[15-i], "%m/%d/%y")
+  t1 <- yearFraction(date3, "2020-03-01")
+  t2 <- yearFraction(date3, "2020-09-01")
+  cf3 <- c3*exp(-spot[i,1]*t1) + c3*exp(-spot[i,2]*t2)
+  spot[i,3] <- -log((dirtyprice[i,3] - cf3)/(redem+c3))/yearFraction(date3, "2021-03-01")
+}
+
+c4 <- as.numeric(as.character(bondprice[1,5]))*100/2
+for (i in 1:10){
+  date4 <- as.Date(bondprice$X[15-i], "%m/%d/%y")
+  t1 <- yearFraction(date4, "2020-03-01")
+  t2 <- yearFraction(date4, "2020-09-01")
+  t3 <- yearFraction(date4, "2021-03-01")
+  cf4 <- c4*exp(-spot[i,1]*t1) + c4*exp(-spot[i,2]*t2) + c4*exp(-spot[i,3]*t3)
+  spot[i,4] <- -log((dirtyprice[i,4] - cf4)/(redem+c4))/yearFraction(date4, "2021-09-01")
+}
+
+c5 <- as.numeric(as.character(bondprice[1,6]))*100/2
+for (i in 1:10){
+  date5 <- as.Date(bondprice$X[15-i], "%m/%d/%y")
+  t1 <- yearFraction(date5, "2020-03-01")
+  t2 <- yearFraction(date5, "2020-09-01")
+  t3 <- yearFraction(date5, "2021-03-01")
+  t4 <- yearFraction(date5, "2021-09-01")
+  cf5 <- c5*exp(-spot[i,1]*t1) + c5*exp(-spot[i,2]*t2) + c5*exp(-spot[i,3]*t3) + c5*exp(-spot[i,4]*t4)
+  spot[i,5] <- -log((dirtyprice[i,5] - cf5)/(redem+c5))/yearFraction(date5, "2022-03-01")
+}
+
+c6 <- as.numeric(as.character(bondprice[1,7]))*100/2
+for (i in 1:10){
+  date6 <- as.Date(bondprice$X[15-i], "%m/%d/%y")
+  t1 <- yearFraction(date6, "2020-03-01")
+  t2 <- yearFraction(date6, "2020-09-01")
+  t3 <- yearFraction(date6, "2021-03-01")
+  t4 <- yearFraction(date6, "2021-09-01")
+  t5 <- yearFraction(date6, "2022-03-01")
+  cf6 <- c6*exp(-spot[i,1]*t1) + c6*exp(-spot[i,2]*t2) + c6*exp(-spot[i,3]*t3) + c6*exp(-spot[i,4]*t4) + c6*exp(-spot[i,5]*t5)
+  spot[i,6] <- -log((dirtyprice[i,6] - cf6)/(redem+c6))/yearFraction(date6, "2022-09-01")
+}
+
+c7 <- as.numeric(as.character(bondprice[1,8]))*100/2
+for (i in 1:10){
+  date7 <- as.Date(bondprice$X[15-i], "%m/%d/%y")
+  t1 <- yearFraction(date7, "2020-03-01")
+  t2 <- yearFraction(date7, "2020-09-01")
+  t3 <- yearFraction(date7, "2021-03-01")
+  t4 <- yearFraction(date7, "2021-09-01")
+  t5 <- yearFraction(date7, "2022-03-01")
+  t6 <- yearFraction(date7, "2022-09-01")
+  cf7 <- c7*exp(-spot[i,1]*t1) + c7*exp(-spot[i,2]*t2) + c7*exp(-spot[i,3]*t3) + c7*exp(-spot[i,4]*t4) + c7*exp(-spot[i,5]*t5) + c7*exp(-spot[i,6]*t6)
+  spot[i,7] <- -log((dirtyprice[i,7] - cf7)/(redem+c7))/yearFraction(date7, "2023-03-01")
+}
+
+c8 <- as.numeric(as.character(bondprice[1,9]))*100/2
+for (i in 1:10){
+  date8 <- as.Date(bondprice$X[15-i], "%m/%d/%y")
+  t1 <- yearFraction(date8, "2020-03-01")
+  t2 <- yearFraction(date8, "2020-09-01")
+  t3 <- yearFraction(date8, "2021-03-01")
+  t4 <- yearFraction(date8, "2021-09-01")
+  t5 <- yearFraction(date8, "2022-03-01")
+  t6 <- yearFraction(date8, "2022-09-01")
+  t7 <- yearFraction(date8, "2023-03-01")
+  cf8 <- c8*exp(-spot[i,1]*t1) + c8*exp(-spot[i,2]*t2) + c8*exp(-spot[i,3]*t3) + c8*exp(-spot[i,4]*t4) + c8*exp(-spot[i,5]*t5) + c8*exp(-spot[i,6]*t6) + c8*exp(-spot[i,7]*t7)
+  spot[i,8] <- -log((dirtyprice[i,8] - cf8)/(redem+c8))/yearFraction(date8, "2023-09-01")
+}
+
+c9 <- as.numeric(as.character(bondprice[1,10]))*100/2
+for (i in 1:10){
+  date9 <- as.Date(bondprice$X[15-i], "%m/%d/%y")
+  t1 <- yearFraction(date9, "2020-03-01")
+  t2 <- yearFraction(date9, "2020-09-01")
+  t3 <- yearFraction(date9, "2021-03-01")
+  t4 <- yearFraction(date9, "2021-09-01")
+  t5 <- yearFraction(date9, "2022-03-01")
+  t6 <- yearFraction(date9, "2022-09-01")
+  t7 <- yearFraction(date9, "2023-03-01")
+  t8 <- yearFraction(date9, "2023-09-01")
+  cf9 <- c9*exp(-spot[i,1]*t1) + c9*exp(-spot[i,2]*t2) + c9*exp(-spot[i,3]*t3) + c9*exp(-spot[i,4]*t4) + c9*exp(-spot[i,5]*t5) + c9*exp(-spot[i,6]*t6) + c9*exp(-spot[i,7]*t7) + c9*exp(-spot[i,8]*t8)
+  spot[i,9] <- -log((dirtyprice[i,9] - cf9)/(redem+c9))/yearFraction(date9, "2024-03-01")
+}
+
+c10 <- as.numeric(as.character(bondprice[1,11]))*100/2
+for (i in 1:10){
+  date10 <- as.Date(bondprice$X[15-i], "%m/%d/%y")
+  t1 <- yearFraction(date10, "2020-03-01")
+  t2 <- yearFraction(date10, "2020-09-01")
+  t3 <- yearFraction(date10, "2021-03-01")
+  t4 <- yearFraction(date10, "2021-09-01")
+  t5 <- yearFraction(date10, "2022-03-01")
+  t6 <- yearFraction(date10, "2022-09-01")
+  t7 <- yearFraction(date10, "2023-03-01")
+  t8 <- yearFraction(date10, "2023-09-01")
+  t9 <- yearFraction(date10, "2024-03-01")
+  cf10 <- c10*exp(-spot[i,1]*t1) + c10*exp(-spot[i,2]*t2) + c10*exp(-spot[i,3]*t3) + c10*exp(-spot[i,4]*t4) + c10*exp(-spot[i,5]*t5) + c10*exp(-spot[i,6]*t6) + c10*exp(-spot[i,7]*t7) + c10*exp(-spot[i,8]*t8) + c10*exp(-spot[i,9]*t9)
+  spot[i,10] <- -log((dirtyprice[i,10] - cf10)/(redem+c10))/yearFraction(date10, "2024-09-01")
+}
+```
+Plot for spot rate.
+```{r}
+d <- seq(0.5, 5, by=0.5)
+plot(d, spot[1,], col = 1, type = "l", xlab = "period", ylab = "spot rate", main = "5-year Spot rate for 10 bonds of 10 days")
+for (i in 2:10) {
+  lines(d, spot[i,], col = i, type = "l")
+}
+
+legend("topright", legend = c("2020-01-02", "2020-01-03", "2020-01-06", "2020-01-07", "2020-01-08", "2020-01-09","2020-01-10", "2020-01-13", "2020-01-14","2020-01-15"), col = 1:10, lty = 1)
+
+
+```
+Empirical Questions 4c) Forward rate
+```{r}
+
+forwardrate <- matrix(ncol = 4, nrow = 10)
+  
+for (i in 1:10){
+  day1 <- as.Date(bondprice$X[15-i], "%m/%d/%y")
+  tt1 <- yearFraction(day1, "2020-03-01")
+  tt2 <- yearFraction(day1, "2021-03-01")
+  
+  forwardrate[i,1] <- (spot[i,3]*tt2 - spot[i,1]*tt1)/(tt2-tt1)
+}
+
+for (i in 1:10){
+  day2 <- as.Date(bondprice$X[15-i], "%m/%d/%y")
+  tt3 <- yearFraction(day2, "2020-03-01")
+  tt4 <- yearFraction(day2, "2022-03-01")
+  
+  forwardrate[i,2] <- (spot[i,5]*tt4 - spot[i,1]*tt3)/(tt4-tt3)
+}
+
+for (i in 1:10){
+  day3 <- as.Date(bondprice$X[15-i], "%m/%d/%y")
+  tt5 <- yearFraction(day3, "2020-03-01")
+  tt6 <- yearFraction(day3, "2023-03-01")
+  
+  forwardrate[i,3] <- (spot[i,7]*tt6 - spot[i,1]*tt5)/(tt6-tt5)
+}
+
+for (i in 1:10){
+  day4 <- as.Date(bondprice$X[15-i], "%m/%d/%y")
+  tt7 <- yearFraction(day4, "2020-03-01")
+  tt8 <- yearFraction(day4, "2024-03-01")
+  
+  forwardrate[i,4] <- (spot[i,9]*tt8 - spot[i,1]*tt7)/(tt8-tt7)
+}
+
+```
+Plot for forward rate.
+```{r}
+
+plot(forwardrate[1,], col = 1, type = "l", xlab = "period", ylab = "forward rate", main = "Forward rate of 10 bonds in 10 days", ylim = c(0.015, 0.0165))
+for (i in 2:10) {
+  lines(forwardrate[i,], col = i, type = "l")
+}
+legend("topright", legend = c("2020-01-02", "2020-01-03", "2020-01-06", "2020-01-07", "2020-01-08", "2020-01-09","2020-01-10", "2020-01-13", "2020-01-14","2020-01-15"), col = 1:10, lty = 1)
+
+
+```
+Empirical Questions 5) Covariances matrices.
+```{r}
+yieldseries <- matrix(ncol = 5, nrow = 9)
+for(i in 1:5){
+  for (j in 1:9){
+    yieldseries[j,i] <- log(yield[j+1,i]/yield[j,i])
+  }
+}
+covyield <- cov(yieldseries)
+covyield
+```
+
+```{r}
+forwardseries <- matrix(ncol = 4, nrow = 9)
+for(i in 1:4){
+  for (j in 1:9){
+    forwardseries[j,i] <- log(forwardrate[j+1,i]/forwardrate[j,i])
+  }
+}
+covforward <- cov(forwardseries)
+covforward
+```
+Empirical Questions 6) Eigenvalues and eigenvectors.
+```{r}
+y <- eigen(covyield)
+y$values
+y$vectors
+```
+```{r}
+f <- eigen(covforward)
+f$values
+f$vectors
+```
